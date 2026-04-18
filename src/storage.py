@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from datetime import datetime
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "accounting.db"
 
@@ -25,7 +26,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT,
         partner_id INTEGER,
-        amount REAL
+        amount REAL,
+        created_at TEXT
     )
     """)
 
@@ -63,10 +65,12 @@ def get_partners():
 def insert_transaction(type_, partner_id, amount):
     conn = get_connection()
     cur = conn.cursor()
+
     cur.execute(
-        "INSERT INTO transactions (type, partner_id, amount) VALUES (?, ?, ?)",
-        (type_, partner_id, amount),
+        "INSERT INTO transactions (type, partner_id, amount, created_at) VALUES (?, ?, ?, ?)",
+        (type_, partner_id, amount, datetime.now().isoformat()),
     )
+
     tx_id = cur.lastrowid
     conn.commit()
     conn.close()
@@ -106,6 +110,7 @@ def get_journal_data():
             t.id,
             t.type,
             t.amount,
+            t.created_at,
             p.name,
             e.account,
             e.debit,
