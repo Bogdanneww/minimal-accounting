@@ -1,5 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
 .venv/
 venv/
-__pycache__/
+env/
+
+# IDE
 .idea/
-data/*.db
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Database
+data/accounting.db
+
+# Logs
+*.log
+
+# PyCharm
+*.iml
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+
+# Build
+dist/
+build/
