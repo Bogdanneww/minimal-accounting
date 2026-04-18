@@ -1,166 +1,133 @@
 import streamlit as st
 import pandas as pd
-from collections import defaultdict
-
-from storage import init_db, insert_partner, get_partners, get_journal_data
-from engine import (
-    post_invoice,
-    post_payment,
-    post_expense,
-    post_vendor_payment
-)
-from reports import get_pnl, get_partner_ledger
+from storage import init_db, query, get_journal_data
+from engine import post_transaction
+from reports import get_pnl, get_partner_ledger, get_account_balance, get_cash_balance
 from constants import ACCOUNTS
 
 init_db()
+st.set_page_config(page_title="Minimal Accounting", page_icon="💰", layout="wide")
 
-st.set_page_config(layout="wide")
+# Головний заголовок
+st.title("🏦 Minimal Accounting System")
+st.caption("Professional Double-Entry Ledger")
+st.divider()
 
-st.title("📊 Minimal Accounting App")
+# Навігація у бічній панелі
+with st.sidebar:
+    st.markdown("## 🧭 Navigation")
+    st.divider()
+    menu = st.radio(
+        "Menu",
+        ["🤝 Partners", "💸 Transactions", "🏠 Dashboard", "📖 General Journal"],
+        label_visibility="collapsed"
+    )
 
-menu = st.sidebar.radio(
-    "Navigation",
-    [
-        "Create Partner",
-        "Invoice",
-        "Customer Payment",
-        "Expense (Create Payable)",
-        "Pay Vendor",
-        "Reports",
-        "Journal"
-    ]
-)
+# Отримання даних про партнерів
+partners = query("SELECT id, name, type FROM partners", fetch=True)
+p_map = {f"{p[1]} ({p[2]})": (p[0], p[2]) for p in partners}
 
-partners = get_partners()
+# --- PARTNERS ---
+if menu == "🤝 Partners":
+    st.subheader("🤝 Partner Management")
+    with st.expander("➕ Add New Partner", expanded=not bool(partners)):
+        c1, c2 = st.columns(2)
+        name = c1.text_input("Name / Company Name")
+        p_type = c2.selectbox("Relationship", ["customer", "vendor"])
+        if st.button("Save Partner"):
+            if name.strip():
+                query("INSERT INTO partners (name, type) VALUES (?, ?)", (name, p_type), commit=True)
+                st.success(f"✅ Partner '{name}' created successfully!")
+                st.rerun()
+            else:
+                st.error("Partner name cannot be empty.")
 
-customers = {f"{p[1]}": p[0] for p in partners if p[2] == "customer"}
-vendors = {f"{p[1]}": p[0] for p in partners if p[2] == "vendor"}
+    if partners:
+        st.write("### Active Partners")
+        df_p = pd.DataFrame(partners, columns=["ID", "Name", "Type"])
+        st.dataframe(df_p, use_container_width=True, hide_index=True)
 
+# --- TRANSACTIONS ---
+elif menu == "💸 Transactions":
+    st.subheader("📝 Post New Transaction")
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            type_options = [
+                ("invoice", "📄 Customer Invoice"),
+                ("payment", "💰 Receive Payment"),
+                ("expense", "🧾 Vendor Bill"),
+                ("vendor_payment", "💸 Pay Vendor")
+            ]
+            type_select = st.selectbox("Operation", type_options, format_func=lambda x: x[1])
+        with c2:
+            p_options = list(p_map.keys())
+            if p_options:
+                p_label = st.selectbox("Partner", p_options)
+                amount = st.number_input("Amount ($)", min_value=0.0, step=0.01, format="%.2f")
+            else:
+                st.warning("Please create a partner first in the 'Partners' tab.")
 
-# CREATE PARTNER
-if menu == "Create Partner":
-    name = st.text_input("Name")
-    type_ = st.selectbox("Type", ["customer", "vendor"])
+        if p_options and st.button("🚀 Post Transaction", use_container_width=True):
+            if amount > 0:
+                post_transaction(type_select[0], p_map[p_label][0], amount)
+                st.success(f"✅ Success! Transaction for {p_label} recorded: ${amount:,.2f}")
+            else:
+                st.error("Amount must be greater than zero.")
 
-    if st.button("Create"):
-        insert_partner(name, type_)
-        st.success("Created")
+# --- DASHBOARD ---
+elif menu == "🏠 Dashboard":
+    cash = get_account_balance("1000")
+    ar = get_account_balance("1100")
+    ap = get_account_balance("2000")
+    rev = get_account_balance("4000")
+    exp = get_account_balance("5000")
 
-
-# INVOICE
-elif menu == "Invoice":
-    if not customers:
-        st.warning("Create customer first")
-    else:
-        partner = st.selectbox("Customer", list(customers.keys()))
-        amount = st.number_input("Amount", min_value=0.0)
-
-        if st.button("Create Invoice"):
-            post_invoice(customers[partner], amount)
-            st.success("Invoice posted")
-
-
-# CUSTOMER PAYMENT
-elif menu == "Customer Payment":
-    if not customers:
-        st.warning("Create customer first")
-    else:
-        partner = st.selectbox("Customer", list(customers.keys()))
-        amount = st.number_input("Amount", min_value=0.0)
-
-        if st.button("Receive Payment"):
-            post_payment(customers[partner], amount)
-            st.success("Payment posted")
-
-
-# EXPENSE (AP)
-elif menu == "Expense (Create Payable)":
-    if not vendors:
-        st.warning("Create vendor first")
-    else:
-        partner = st.selectbox("Vendor", list(vendors.keys()))
-        amount = st.number_input("Amount", min_value=0.0)
-
-        if st.button("Record Expense"):
-            post_expense(vendors[partner], amount)
-            st.success("Expense created (AP)")
-
-
-# PAY VENDOR
-elif menu == "Pay Vendor":
-    if not vendors:
-        st.warning("Create vendor first")
-    else:
-        partner = st.selectbox("Vendor", list(vendors.keys()))
-        amount = st.number_input("Amount", min_value=0.0)
-
-        if st.button("Pay"):
-            post_vendor_payment(vendors[partner], amount)
-            st.success("Vendor paid")
-
-
-# REPORTS
-elif menu == "Reports":
-    st.subheader("📈 Profit & Loss")
-
-    pnl = get_pnl()
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Revenue", pnl["Revenue"])
-    col2.metric("Expense", pnl["Expense"])
-    col3.metric("Profit", pnl["Profit"])
+    # Видалено параметри delta для чистого відображення
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("💰 Cash (1000)", f"${cash:,.2f}")
+    m2.metric("⏳ Receivable (1100)", f"${ar:,.2f}")
+    m3.metric("🧾 Payable (2000)", f"${ap:,.2f}")
+    m4.metric("📈 Revenue (4000)", f"${rev:,.2f}")
+    m5.metric("📉 Expenses (5000)", f"${exp:,.2f}")
 
     st.divider()
 
-    st.subheader("👥 Partner Ledger")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.subheader("👥 Partner Balances")
+        ledger = get_partner_ledger()
+        if not ledger.empty:
+            def style_bal(val):
+                color = 'red' if val < 0 else 'green' if val > 0 else 'grey'
+                return f'color: {color}; font-weight: bold'
 
-    ledger = get_partner_ledger()
-    st.dataframe(ledger, use_container_width=True)
 
-    st.caption("""
-    Customer (AR): positive → owes you  
-    Vendor (AP): negative → you owe vendor
-    """)
-
-
-# JOURNAL
-elif menu == "Journal":
-    st.subheader("📒 Journal")
-
-    data = get_journal_data()
-    grouped = defaultdict(list)
-
-    for row in data:
-        tx_id, tx_type, amount, created_at, partner, account, debit, credit = row
-
-        grouped[tx_id].append({
-            "type": tx_type,
-            "amount": amount,
-            "partner": partner,
-            "account": account,
-            "debit": debit,
-            "credit": credit,
-        })
-
-    for tx_id, entries in grouped.items():
-        st.markdown(f"### Transaction #{tx_id}")
-
-        total_debit = sum(e["debit"] for e in entries)
-        total_credit = sum(e["credit"] for e in entries)
-
-        if total_debit == total_credit:
-            st.success("Balanced")
+            st.dataframe(
+                ledger.style.map(style_bal, subset=['Balance']).format({"Balance": "${:,.2f}"}),
+                use_container_width=True, hide_index=True
+            )
         else:
-            st.error("NOT Balanced")
+            st.info("No partner data available.")
 
-        table = []
-
-        for e in entries:
-            table.append({
-                "Account": f"{e['account']} - {ACCOUNTS[e['account']]}",
-                "Debit": e["debit"],
-                "Credit": e["credit"],
+    with col2:
+        st.subheader("📊 Profit Distribution")
+        if rev > 0 or exp > 0:
+            chart_data = pd.DataFrame({
+                "Type": ["Revenue", "Expense"],
+                "Amount": [rev, exp]
             })
+            st.bar_chart(chart_data, x="Type", y="Amount")
 
-        st.dataframe(pd.DataFrame(table), use_container_width=True)
-        st.divider()
+# --- JOURNAL ---
+elif menu == "📖 General Journal":
+    st.subheader("📖 General Journal")
+    data = get_journal_data()
+    if data:
+        df_j = pd.DataFrame(data, columns=["ID", "Type", "Total", "Date", "Partner", "Acc", "Debit", "Credit"])
+        st.dataframe(
+            df_j.style.format({"Debit": "{:,.2f}", "Credit": "{:,.2f}", "Total": "{:,.2f}"}),
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.info("The journal is empty.")

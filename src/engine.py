@@ -1,49 +1,21 @@
-from storage import insert_transaction, insert_entries
+import sqlite3
+from datetime import datetime
+
+from storage import query, DB_PATH
+from constants import TX_CONFIG
 
 
-# CUSTOMER SIDE
-def post_invoice(partner_id, amount):
-    tx_id = insert_transaction("invoice", partner_id, amount)
+def post_transaction(tx_type, partner_id, amount):
+    if amount <= 0: return
+    p_acc, p_side, o_acc, o_side = TX_CONFIG[tx_type]
 
-    entries = [
-        (tx_id, "1100", amount, 0),  # DR Accounts Receivable
-        (tx_id, "4000", 0, amount),  # CR Revenue
-    ]
-
-    insert_entries(entries)
-
-
-def post_payment(partner_id, amount):
-    tx_id = insert_transaction("payment", partner_id, amount)
+    tx_id = query("INSERT INTO transactions (type, partner_id, amount, created_at) VALUES (?, ?, ?, ?)",
+                  (tx_type, partner_id, amount, datetime.now().strftime("%Y-%m-%d %H:%M")), commit=True)
 
     entries = [
-        (tx_id, "1000", amount, 0),  # DR Cash
-        (tx_id, "1100", 0, amount),  # CR AR
+        (tx_id, p_acc, amount if p_side == "dr" else 0, amount if p_side == "cr" else 0),
+        (tx_id, o_acc, amount if o_side == "dr" else 0, amount if o_side == "cr" else 0)
     ]
 
-    insert_entries(entries)
-
-
-# VENDOR SIDE
-def post_expense(partner_id, amount):
-    # create a debt to the supplier
-    tx_id = insert_transaction("expense", partner_id, amount)
-
-    entries = [
-        (tx_id, "5000", amount, 0),  # DR Expense
-        (tx_id, "2000", 0, amount),  # CR Accounts Payable
-    ]
-
-    insert_entries(entries)
-
-
-def post_vendor_payment(partner_id, amount):
-    # payment to the supplier
-    tx_id = insert_transaction("vendor_payment", partner_id, amount)
-
-    entries = [
-        (tx_id, "2000", amount, 0),  # DR AP
-        (tx_id, "1000", 0, amount),  # CR Cash
-    ]
-
-    insert_entries(entries)
+    with sqlite3.connect(DB_PATH) as conn:  # Використовуємо DB_PATH з storage
+        conn.executemany("INSERT INTO entries (transaction_id, account, debit, credit) VALUES (?, ?, ?, ?)", entries)
