@@ -17,5 +17,5 @@ def post_transaction(tx_type, partner_id, amount):
         (tx_id, o_acc, amount if o_side == "dr" else 0, amount if o_side == "cr" else 0)
     ]
 
-    with sqlite3.connect(DB_PATH) as conn:  # Використовуємо DB_PATH з storage
+    with sqlite3.connect(DB_PATH) as conn:
         conn.executemany("INSERT INTO entries (transaction_id, account, debit, credit) VALUES (?, ?, ?, ?)", entries)

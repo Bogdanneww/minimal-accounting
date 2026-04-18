@@ -19,10 +19,9 @@ def get_pnl():
 def get_account_balance(acc_code):
     df = get_report_df(f"SELECT debit, credit FROM entries WHERE account = '{acc_code}'")
     if df.empty: return 0.0
-    # Активні рахунки: Баланс = Дебет - Кредит
+
     if acc_code in ['1000', '1100', '5000']:
         return df['debit'].sum() - df['credit'].sum()
-    # Пасивні/Дохідні рахунки: Баланс = Кредит - Дебет
     else:
         return df['credit'].sum() - df['debit'].sum()
 

@@ -8,12 +8,12 @@ from constants import ACCOUNTS
 init_db()
 st.set_page_config(page_title="Minimal Accounting", page_icon="💰", layout="wide")
 
-# Головний заголовок
+# Main title
 st.title("🏦 Minimal Accounting System")
 st.caption("Professional Double-Entry Ledger")
 st.divider()
 
-# Навігація у бічній панелі
+# Sidebar navigation
 with st.sidebar:
     st.markdown("## 🧭 Navigation")
     st.divider()
@@ -23,7 +23,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-# Отримання даних про партнерів
+# Obtaining partner data
 partners = query("SELECT id, name, type FROM partners", fetch=True)
 p_map = {f"{p[1]} ({p[2]})": (p[0], p[2]) for p in partners}
 
@@ -77,47 +77,49 @@ elif menu == "💸 Transactions":
 
 # --- DASHBOARD ---
 elif menu == "🏠 Dashboard":
+    pnl = get_pnl()
     cash = get_account_balance("1000")
     ar = get_account_balance("1100")
     ap = get_account_balance("2000")
-    rev = get_account_balance("4000")
-    exp = get_account_balance("5000")
 
-    # Видалено параметри delta для чистого відображення
+    # First row: 5 main accounts
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("💰 Cash (1000)", f"${cash:,.2f}")
     m2.metric("⏳ Receivable (1100)", f"${ar:,.2f}")
     m3.metric("🧾 Payable (2000)", f"${ap:,.2f}")
-    m4.metric("📈 Revenue (4000)", f"${rev:,.2f}")
-    m5.metric("📉 Expenses (5000)", f"${exp:,.2f}")
+    m4.metric("📈 Revenue (4000)", f"${pnl['Revenue']:,.2f}")
+    m5.metric("📉 Expenses (5000)", f"${pnl['Expense']:,.2f}")
+
+    st.write("")
+
+    # Dedicated block for Net Profit
+    with st.container(border=True):
+        col_text, col_val = st.columns([3, 1])
+        with col_text:
+            st.markdown("### 💎 Net Profit ")
+            st.caption("Financial result for the current period (Revenue - Expenses)")
+        with col_val:
+            profit = pnl['Profit']
+            color = "#2e7d32" if profit >= 0 else "#d32f2f"
+            st.markdown(f"<h2 style='text-align: right; color: {color};'>${profit:,.2f}</h2>", unsafe_allow_html=True)
 
     st.divider()
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("👥 Partner Balances")
-        ledger = get_partner_ledger()
-        if not ledger.empty:
-            def style_bal(val):
-                color = 'red' if val < 0 else 'green' if val > 0 else 'grey'
-                return f'color: {color}; font-weight: bold'
+    # Full-width partner table
+    st.subheader("👥 Partner Balances")
+    ledger = get_partner_ledger()
+    if not ledger.empty:
+        def style_bal(val):
+            color = 'red' if val < 0 else 'green' if val > 0 else 'grey'
+            return f'color: {color}; font-weight: bold'
 
 
-            st.dataframe(
-                ledger.style.map(style_bal, subset=['Balance']).format({"Balance": "${:,.2f}"}),
-                use_container_width=True, hide_index=True
-            )
-        else:
-            st.info("No partner data available.")
-
-    with col2:
-        st.subheader("📊 Profit Distribution")
-        if rev > 0 or exp > 0:
-            chart_data = pd.DataFrame({
-                "Type": ["Revenue", "Expense"],
-                "Amount": [rev, exp]
-            })
-            st.bar_chart(chart_data, x="Type", y="Amount")
+        st.dataframe(
+            ledger.style.map(style_bal, subset=['Balance']).format({"Balance": "${:,.2f}"}),
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.info("No partner data available.")
 
 # --- JOURNAL ---
 elif menu == "📖 General Journal":
