@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 from storage import init_db, query, get_journal_data
 from engine import post_transaction
-from reports import get_pnl, get_partner_ledger, get_account_balance, get_cash_balance
-from constants import ACCOUNTS
+from reports import get_pnl, get_partner_ledger, get_account_balance
+
 
 init_db()
 st.set_page_config(page_title="Minimal Accounting", page_icon="💰", layout="wide")
@@ -20,7 +20,7 @@ with st.sidebar:
     menu = st.radio(
         "Menu",
         ["🤝 Partners", "💸 Transactions", "🏠 Dashboard", "📖 General Journal"],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
 
 # Obtaining partner data
@@ -36,7 +36,11 @@ if menu == "🤝 Partners":
         p_type = c2.selectbox("Relationship", ["customer", "vendor"])
         if st.button("Save Partner"):
             if name.strip():
-                query("INSERT INTO partners (name, type) VALUES (?, ?)", (name, p_type), commit=True)
+                query(
+                    "INSERT INTO partners (name, type) VALUES (?, ?)",
+                    (name, p_type),
+                    commit=True,
+                )
                 st.success(f"✅ Partner '{name}' created successfully!")
                 st.rerun()
             else:
@@ -57,21 +61,27 @@ elif menu == "💸 Transactions":
                 ("invoice", "📄 Customer Invoice"),
                 ("payment", "💰 Receive Payment"),
                 ("expense", "🧾 Vendor Bill"),
-                ("vendor_payment", "💸 Pay Vendor")
+                ("vendor_payment", "💸 Pay Vendor"),
             ]
-            type_select = st.selectbox("Operation", type_options, format_func=lambda x: x[1])
+            type_select = st.selectbox(
+                "Operation", type_options, format_func=lambda x: x[1]
+            )
         with c2:
             p_options = list(p_map.keys())
             if p_options:
                 p_label = st.selectbox("Partner", p_options)
-                amount = st.number_input("Amount ($)", min_value=0.0, step=0.01, format="%.2f")
+                amount = st.number_input(
+                    "Amount ($)", min_value=0.0, step=0.01, format="%.2f"
+                )
             else:
                 st.warning("Please create a partner first in the 'Partners' tab.")
 
         if p_options and st.button("🚀 Post Transaction", use_container_width=True):
             if amount > 0:
                 post_transaction(type_select[0], p_map[p_label][0], amount)
-                st.success(f"✅ Success! Transaction for {p_label} recorded: ${amount:,.2f}")
+                st.success(
+                    f"✅ Success! Transaction for {p_label} recorded: ${amount:,.2f}"
+                )
             else:
                 st.error("Amount must be greater than zero.")
 
@@ -99,9 +109,12 @@ elif menu == "🏠 Dashboard":
             st.markdown("### 💎 Net Profit ")
             st.caption("Financial result for the current period (Revenue - Expenses)")
         with col_val:
-            profit = pnl['Profit']
+            profit = pnl["Profit"]
             color = "#2e7d32" if profit >= 0 else "#d32f2f"
-            st.markdown(f"<h2 style='text-align: right; color: {color};'>${profit:,.2f}</h2>", unsafe_allow_html=True)
+            st.markdown(
+                f"<h2 style='text-align: right; color: {color};'>${profit:,.2f}</h2>",
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 
@@ -109,14 +122,17 @@ elif menu == "🏠 Dashboard":
     st.subheader("👥 Partner Balances")
     ledger = get_partner_ledger()
     if not ledger.empty:
-        def style_bal(val):
-            color = 'red' if val < 0 else 'green' if val > 0 else 'grey'
-            return f'color: {color}; font-weight: bold'
 
+        def style_bal(val):
+            color = "red" if val < 0 else "green" if val > 0 else "grey"
+            return f"color: {color}; font-weight: bold"
 
         st.dataframe(
-            ledger.style.map(style_bal, subset=['Balance']).format({"Balance": "${:,.2f}"}),
-            use_container_width=True, hide_index=True
+            ledger.style.map(style_bal, subset=["Balance"]).format(
+                {"Balance": "${:,.2f}"}
+            ),
+            use_container_width=True,
+            hide_index=True,
         )
     else:
         st.info("No partner data available.")
@@ -126,10 +142,25 @@ elif menu == "📖 General Journal":
     st.subheader("📖 General Journal")
     data = get_journal_data()
     if data:
-        df_j = pd.DataFrame(data, columns=["ID", "Type", "Total", "Date", "Partner", "Acc", "Debit", "Credit"])
+        df_j = pd.DataFrame(
+            data,
+            columns=[
+                "ID",
+                "Type",
+                "Total",
+                "Date",
+                "Partner",
+                "Acc",
+                "Debit",
+                "Credit",
+            ],
+        )
         st.dataframe(
-            df_j.style.format({"Debit": "{:,.2f}", "Credit": "{:,.2f}", "Total": "{:,.2f}"}),
-            use_container_width=True, hide_index=True
+            df_j.style.format(
+                {"Debit": "{:,.2f}", "Credit": "{:,.2f}", "Total": "{:,.2f}"}
+            ),
+            use_container_width=True,
+            hide_index=True,
         )
     else:
         st.info("The journal is empty.")
