@@ -1,0 +1,49 @@
+# --- Python & Environment ---
+.venv/
+venv/
+env/
+ENV/
+bin/
+lib/
+include/
+share/
+pyvenv.cfg
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# --- Data & Databases ---
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# --- Streamlit & Internal Configs ---
+.streamlit/
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# --- Version Control & IDE ---
+.git/
+.gitignore
+.gitattributes
+.github/
+.idea/
+.vscode/
+*.swp
+*.bak
+
+# --- Docker & Build Artifacts ---
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# --- OS Specific Files ---
+.DS_Store
+Thumbs.db
+
+# --- Miscellaneous ---
+.env
+*.log
+tests/
+README.md
