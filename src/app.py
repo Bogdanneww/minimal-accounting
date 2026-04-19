@@ -4,7 +4,6 @@ from storage import init_db, query, get_journal_data
 from engine import post_transaction
 from reports import get_pnl, get_partner_ledger, get_account_balance
 
-
 init_db()
 st.set_page_config(page_title="Minimal Accounting", page_icon="💰", layout="wide")
 
